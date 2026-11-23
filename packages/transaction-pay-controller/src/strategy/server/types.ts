@@ -101,6 +101,8 @@ export type ServerQuotePayload = {
   steps: ServerStep[];
   gasless: boolean;
   callsDeferred?: boolean;
+  /** Opaque value to send back unchanged when submitting the quote. */
+  signature?: string;
 };
 
 /** Fee breakdown from a quote. */
@@ -145,6 +147,8 @@ export type ServerQuote = {
   client: ServerQuoteClient;
   steps: ServerStep[];
   gasless: boolean;
+  /** Opaque value to send back unchanged when submitting the quote. */
+  signature?: string;
 };
 
 /** Log from the source transaction receipt sent to POST /status. */
@@ -180,6 +184,7 @@ export type ServerSubmitRequest = {
   to: Hex;
   data: Hex;
   value: string;
+  signature?: string;
   authorizationList?: {
     chainId: number;
     address: Hex;
@@ -193,5 +198,7 @@ export type ServerSubmitRequest = {
 /** Response body from POST /submit. */
 export type ServerSubmitResponse = {
   success: boolean;
+  /** Provider request ID to poll status with, if different to the quote ID. */
+  id?: string;
   error?: string;
 };
