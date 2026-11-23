@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** `TransactionPayControllerMessenger` requires the `AccountTreeController:getState`, `NetworkController:getState`, `RampsController:getState`, `TransactionController:failTransaction` and `TransactionController:finalizeResumedTransaction` actions ([#11450](https://github.com/MetaMask/core/pull/11450))
 - Send the quote `signature` when submitting gasless server quotes, and poll status with the `id` returned by the submit ([#11714](https://github.com/MetaMask/core/pull/11714))
+  - Build the delegation for subsidized server quotes with the subsidized caveats, from the quote's source calls, so the server can set the real order ID after signing.
 - Price gas station fees by simulating the full EIP-7702 batch instead of scaling the first transaction ([#11626](https://github.com/MetaMask/core/pull/11626))
   - Multi-transaction quotes now pass every origin transaction, including the original transaction for post-quote flows, to `TransactionController:getGasFeeTokens` as the batch that is submitted.
   - Predict withdrawals that pay from a Safe still simulate the first transaction and scale it by the total gas estimate.
