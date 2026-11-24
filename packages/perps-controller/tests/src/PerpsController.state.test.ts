@@ -799,8 +799,11 @@ describe('PerpsController', () => {
 
       const unsubscribe = controller.subscribeToOrderFills(params);
 
-      expect(unsubscribe).toBe(mockUnsubscribe);
-      expect(mockProvider.subscribeToOrderFills).toHaveBeenCalledWith(params);
+      expect(mockProvider.subscribeToOrderFills).toHaveBeenCalledWith(
+        expect.objectContaining({ callback: expect.any(Function) }),
+      );
+      unsubscribe();
+      expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
     });
 
     it('sets live data configuration', () => {
@@ -2292,8 +2295,11 @@ describe('PerpsController', () => {
 
       const unsubscribe = controller.subscribeToOrders(params);
 
-      expect(unsubscribe).toBe(mockUnsubscribe);
-      expect(mockProvider.subscribeToOrders).toHaveBeenCalledWith(params);
+      expect(mockProvider.subscribeToOrders).toHaveBeenCalledWith(
+        expect.objectContaining({ callback: expect.any(Function) }),
+      );
+      unsubscribe();
+      expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
     });
 
     it('subscribes to account updates', () => {
@@ -2308,11 +2314,12 @@ describe('PerpsController', () => {
 
       const unsubscribe = controller.subscribeToAccount(params);
 
-      expect(unsubscribe).toBe(mockUnsubscribe);
       // Controller wraps callback to update state, so expect a function rather than exact params
       expect(mockProvider.subscribeToAccount).toHaveBeenCalledWith(
         expect.objectContaining({ callback: expect.any(Function) }),
       );
+      unsubscribe();
+      expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
     });
 
     it('updates accountState with live snapshots and invalidation', () => {

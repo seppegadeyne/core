@@ -161,7 +161,7 @@ Code: `src/types/index.ts` `PerpsPlatformDependencies`, `PerpsCacheInvalidator`,
 
 ## Messenger surface
 
-- 139 method actions named `PerpsController:<method>`, generated into `PerpsController-method-action-types.ts` from `MESSENGER_EXPOSED_METHODS`, plus `PerpsController:getState`. Handlers are registered on the first `init()`, not in the constructor.
+- 148 method actions named `PerpsController:<method>`, generated into `PerpsController-method-action-types.ts` from `MESSENGER_EXPOSED_METHODS`, plus `PerpsController:getState`. Handlers are registered on the first `init()`, not in the constructor.
 - 3 own events: `stateChange`, `stateChanged` and `chaseOrderMaxDistanceReached`.
 - 16 allowed external actions and 3 allowed external events (`RemoteFeatureFlagController:stateChange`, `AccountsController:selectedAccountChange`, `AccountTreeController:selectedAccountGroupChange`).
 
@@ -209,16 +209,46 @@ The controller provides the connect and disconnect primitives. The client decide
 | Event                                                                  | What the controller does                                                                                                                                                                                                                                                                                 |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `init()`                                                               | Waits for any disconnect or reinitialization in flight, reuses `#initializationPromise`, runs `#performInitialization`. Up to 3 attempts, with a 1 s then a 2 s wait between them. On final failure it sets `initializationState` to `Failed` and `initializationError`, then resolves without throwing. |
-| Data call before init                                                  | `getActiveProvider()` throws `CLIENT_REINITIALIZING`, `CLIENT_NOT_INITIALIZED` or `PROVIDER_NOT_AVAILABLE`. `subscribeTo*` returns a no-op unsubscribe when no provider exists.                                                                                                                          |
+| Data call before init                                                  | `getActiveProvider()` throws `CLIENT_REINITIALIZING`, `CLIENT_NOT_INITIALIZED` or `PROVIDER_NOT_AVAILABLE`. `subscribeTo*` joins a pending channel that opens on the next successful init (see Streams).                                                                                                 |
 | `reconnect()`                                                          | Delegates to `provider.reconnect()`. HyperLiquid rebuilds its socket through `HyperLiquidClientService` (up to 10 attempts); the SDK transport also retries 5 times.                                                                                                                                     |
 | `disconnect()`                                                         | Serialised. Stops the preload timer and subscriptions, waits for init or reinit in flight, disconnects the active provider, clears it and `effectiveProvider`, retires the standalone provider, resets `isInitialized`. State caches and the feature-flag subscription stay.                             |
 | Network change (`toggleTestnet`) or provider change (`switchProvider`) | `#beginReinitialization` sets `isReinitializing`, the state flips, init runs again. Failure rolls back. When preload is running it re-runs for the new key.                                                                                                                                              |
-| Account change                                                         | No reinit. User preload refreshes and the rewards address re-registers. Reconnecting the provider for the new account is the client's call.                                                                                                                                                              |
+| Account change                                                         | No reinit. User preload refreshes, the rewards address re-registers and default-account stream channels move to the new account.                                                                                                                                                                         |
 | HIP-3 remote flag change                                               | `FeatureFlagConfigurationService` bumps `hip3ConfigVersion` and the preload watcher re-preloads. Providers get the new HIP-3 config on the next `init()`.                                                                                                                                                |
 
 `PERPS_CONSTANTS` carries the default timings clients use, among them `ConnectionGracePeriodMs` (20 s), `ConnectionAttemptTimeoutMs` (30 s) and `ConnectRetryDelayMs` (200 ms). The controller does not read them; each client's connection owner does.
 
 Code: `src/PerpsController.ts` `init`, `#performInitialization`, `#beginReinitialization`, `getActiveProvider`, `reconnect`, `disconnect`, `#performDisconnect`, `toggleTestnet`, `switchProvider`; `src/services/HyperLiquidClientService.ts` `reconnect`; `src/constants/hyperLiquidConfig.ts` `HYPERLIQUID_TRANSPORT_CONFIG`; `src/constants/perpsConfig.ts` `PERPS_CONSTANTS`.
+
+## Streams
+
+Every `subscribeTo*` method goes through one `StreamChannelManager` (`src/services/StreamChannelManager.ts`). The public method is a thin wrapper that calls `#subscribeToChannel(stream, params, open)`; `#open<Name>` opens the venue subscription.
+
+- One channel per key: stream name, provider instance, account (the selected one when none is given) and every other parameter except the callbacks, `onReset` and `throttleMs`. `prices` symbols are sorted, so their order does not split channels. Two subscribers with the same key share one venue subscription; the last one to leave closes it. `#getChannelKey` builds every key.
+- A subscriber that joins an open channel gets the last value replayed (on a microtask), except event streams such as fills and public trades.
+- `throttleMs` throttles each subscriber on its own.
+- REST is read only while the transport is down: to seed a channel opened while disconnected, and once per drop. Nothing polls.
+- A channel whose source fails is detached from its key: it keeps serving the subscribers it has until they leave and is never reopened, and the next subscribe on that key opens a fresh source. A reader retries after `onError` by unsubscribing and subscribing again.
+- Channels follow the controller context (`StreamChannelManager.rebind`). When init starts, and on `disconnect`, every channel stops its source and waits under a pending provider key. After a successful init or reinitialization (`switchProvider`, `toggleTestnet`) it moves to the new provider instance and reopens; on a selected-account change, default-account channels move to the new account. A move drops the last value and calls each reader's `onReset` when there was one; the next delivery is the new context's data. A subscribe made before init joins a pending channel the same way. Unsubscribe handles stay valid throughout, so a client does not resubscribe after re-init or an account switch. In aggregated mode the channel, not `#trackProviderSubscription`, rebinds its venue subscription.
+- `#withStreamPause` pauses a stream by name (`StreamChannelManager.pause`, ref-counted). While paused, values keep arriving and the latest is kept; when the last pause is released, pending throttled deliveries are dropped and each reader gets the latest value once. `infrastructure.streamManager.pauseChannel`/`resumeChannel` are still called for one release and are deprecated.
+- `getStreamSnapshot(stream, params)` returns the channel's last delivered callback arguments for the same parameters a `subscribeTo*` call takes, or `undefined`. Pair it with the subscription for React's `useSyncExternalStore`.
+- `resubscribeStreams()` stops and restarts every open channel's venue subscription, keeping readers and last values. Call it when a socket reports open but has stopped delivering, such as after an app returns to the foreground. A socket reconnect does not need it: HyperLiquid's `restoreSubscriptions` and `reopenOnReconnect` (order book, public trades) cover that.
+- To keep data warm across screens, hold a no-op `subscribeTo*` subscription; the channel stays open while any reader holds it.
+
+| Subscription                        | Initial value                                                                | Updates on                                                                                                                    |
+| ----------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `subscribeToMarketMeta`             | Provider market list from its session cache                                  | Each market data preload (`startMarketDataPreload`), which re-reads the venue; a delisting shows on the next preload          |
+| `subscribeToMarginAdjustmentLimits` | Computed from the live account and position streams once the market is known | Each account or position push; HyperLiquid makes no venue read                                                                |
+| `subscribeToConnectionLatency`      | Last keepalive round trip, when there is one                                 | Each answered keepalive ping the transport already sends                                                                      |
+| `subscribeToFeeRates`               | One `calculateFees` read for a taker and a maker fill                        | The account's own fills, account switch, default provider change, `invalidateSubscriptionBenefits`                            |
+| `subscribeToTradingAgentValidity`   | One read: agent resolved, then listed by the venue (`extraAgents`)           | `setAgentSigner` / `clearAgentSigners`, venue rejection of the agent, account switch, one timeout at the agent's `validUntil` |
+
+How each client consumes them:
+
+- Mobile and Extension: their client-local `PerpsStreamManager` switches to these Core channels in their own PRs, and their per-screen polling of the same data goes away.
+- Terminal: reads market metadata, latency, fee rates and trading-agent validity through the hooks of its `ControllerPerpsProvider`. It has no margin adjustment screen, so it does not consume `subscribeToMarginAdjustmentLimits`.
+
+Code: `src/services/StreamChannelManager.ts`; `src/PerpsController.ts` `#subscribeToChannel`, `#getChannelKey`, `#rebindStreams`, `#withStreamPause`, `getStreamSnapshot`, `resubscribeStreams`, `ACCOUNT_STREAMS`; `src/providers/HyperLiquidProvider.ts` `subscribeToMarginAdjustmentLimits`, `subscribeToTradingAgentValidity`; `src/services/HyperLiquidClientService.ts` `subscribeToLatency`.
 
 ## What a client must do
 
@@ -226,7 +256,7 @@ Agreed for every client ([TAT-4656](https://consensyssoftware.atlassian.net/brow
 
 - One owner per client decides when to call `init` and `disconnect`. Other components read state; they don't connect.
 - Read connection timings from one config per client. It defaults to the `PERPS_CONSTANTS` timings (`ConnectionGracePeriodMs` 20 s, `ConnectionAttemptTimeoutMs` 30 s, `ConnectRetryDelayMs` 200 ms), and an override goes in that config, not in a local literal.
-- On account change, reconnect the provider if the new account needs live data; the controller refreshes preload but does not reconnect.
+- On account change, don't resubscribe streams: default-account channels move to the new account and call `onReset`. The controller refreshes preload but does not reconnect the provider.
 - While `initializationState` is not ready, show the loading or failed state; don't call data methods.
 - Every `subscribeTo*` call keeps its unsubscribe and calls it on teardown.
 

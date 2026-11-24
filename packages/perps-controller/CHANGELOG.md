@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `subscribeToMarketMeta`: every market's metadata (margin tiers, delisting, max leverage, Cross support), read from the provider's cache at once and re-read after each market data preload. It adds no timer; a failed or empty read goes to `onError` and keeps the last list ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add `subscribeToMarginAdjustmentLimits`: the result `getMarginAdjustmentLimits` returns, computed by HyperLiquid from its live account and position streams with no venue reads. Providers without the stream report `unavailable`/`provider` ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add `subscribeToConnectionLatency`: the round trip of the WebSocket keepalive ping the HyperLiquid transport already sends, in milliseconds, starting with the last measurement. No ping or timer is added ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add `subscribeToFeeRates` (types `SubscribeFeeRatesParams`, `PerpsFeeRates`): the `calculateFees` taker and maker results for a market, read once, then again only after the account's own fills, an account switch, a default provider change or `invalidateSubscriptionBenefits` ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add `subscribeToTradingAgentValidity` (types `SubscribeTradingAgentValidityParams`, `PerpsTradingAgentValidity`): whether the account's trading agent is `valid`, `invalid` (`no_agent`, `not_approved`, `expired`, `rejected`), `unknown` or `not_required`. HyperLiquid reads its `extraAgents` list once, then pushes on `setAgentSigner`/`clearAgentSigners`, a venue rejection, an account switch and one timeout at the agent's `validUntil`; venues without an agent step report `not_required` ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+  - Optional `PerpsProvider.subscribeToTradingAgentValidity`, routed by `AggregatedPerpsProvider`
+- Add optional `feeAmountUsd` to `estimateCrossLiquidation`: the fee is taken from the Cross collateral as the fill takes it; without one the estimate excludes the fee, and a negative or non-finite fee makes the estimate `unavailable` ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add optional `skipCache` to `getMarkets`: HyperLiquid reads the venue's market metadata afresh and refreshes its session cache ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add `getStreamSnapshot(stream, params)` (messenger action `PerpsController:getStreamSnapshot`; types `PerpsStreamName`, `PerpsStreamParams`, `PerpsStreamSnapshot`, `PerpsStreamSnapshotParams`): the last callback arguments of the channel a `subscribeTo*` call with the same parameters reads, or `undefined`, for React's `useSyncExternalStore` ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add `resubscribeStreams()` (messenger action `PerpsController:resubscribeStreams`): stops and restarts every open stream's venue subscription, keeping subscribers and last values, for a socket that reports open but stopped delivering ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add optional `onReset` to every `Subscribe*Params` routed through `StreamChannelManager`: called when the stream moves to another provider or account and its last value no longer applies ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+- Add `StreamChannelManager.rebind`, `pause` and `reopenAll`. `StreamChannelSource.open` and `read` receive the channel key ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+
+### Changed
+
+- Every `subscribeTo*` method now goes through one shared `StreamChannelManager`: one ref-counted venue subscription per parameter set, the last value replayed to later subscribers, a throttle per subscriber, and REST read only while the transport is down. Callers keep the same API ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+  - Every `Subscribe*Params` type routed through it takes an optional `throttleMs`: the minimum time between deliveries to that subscriber, without affecting other subscribers of the same channel
+  - A channel whose venue subscription fails is detached: its subscribers keep it until they leave, and the next subscribe on the same parameters opens a fresh venue subscription instead of rejoining the failed one
+  - The venue subscription always reports failures to the channel, so every subscriber with an `onError` hears them, not only when the subscriber that opened the channel passed one
+  - Subscriptions follow the controller context instead of going dead: a `subscribeTo*` call made before `init` opens when init succeeds; after a re-initialization (`init` after `disconnect`, `switchProvider`, `toggleTestnet`, aggregated rollback) every channel moves to the new provider; on a selected-account change, default-account streams move to the new account. Subscribers keep their unsubscribe and get `onReset`, then the new context's data. Channels stop their venue subscription when init starts and on `disconnect`
+  - `subscribeToAccount`, `subscribeToTwapOrders`, `subscribeToAvailableToTrade` and `subscribeToMarginAdjustmentLimits` no longer deliver `null`/`[]`/`onError`/`unavailable` when an aggregated provider is replaced; subscribers get `onReset` instead
+  - `subscribeToPrices` subscribers that pass the same symbols in a different order share one channel
+  - Stream pauses during writes (`cancelOrders`) now pause Core's own channels: the latest value is kept and delivered once when the operation ends
+- Hyperliquid price updates carry `openInterest` and `volume24h` for every `subscribeToPrices` subscriber, list subscribers (`includeMarketData: false`) included, from the per-DEX `assetCtxs` feed every price subscription already keeps open ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+
+### Deprecated
+
+- `PerpsPlatformDependencies.streamManager` (`pauseChannel`, `resumeChannel`): Core pauses its own channels. It is still called for one release ([TAT-4769](https://consensyssoftware.atlassian.net/browse/TAT-4769))
+
 ## [26.0.0]
 
 ### Added
