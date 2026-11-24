@@ -239,6 +239,7 @@ type FeatureFlagsExtendedRaw = {
       gaslessEnabled?: boolean;
       pollingInterval?: number;
       pollingTimeout?: number;
+      solanaEnabled?: boolean;
       validationEnabled?: ServerValidationEnabledConfig;
     };
   };
@@ -410,12 +411,10 @@ function getStrategyRoutingConfig(
 ): StrategyRoutingConfig {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags = state.remoteFeatureFlags?.confirmations_pay as
-    | FeatureFlagsRaw
-    | undefined;
+    FeatureFlagsRaw | undefined;
   const extendedFeatureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   return normalizeStrategyRoutingConfig(
     featureFlags ?? {},
@@ -566,8 +565,7 @@ export function getFeatureFlags(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay as
-      | FeatureFlagsRaw
-      | undefined) ?? {};
+      FeatureFlagsRaw | undefined) ?? {};
 
   const estimate = new BigNumber(
     featureFlags.relayFallbackGas?.estimate ?? DEFAULT_FALLBACK_GAS_ESTIMATE,
@@ -642,8 +640,7 @@ export function getMaxBalanceRefreshInterval(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   const config = featureFlags.maxBalanceRefreshInterval ?? {};
 
@@ -671,12 +668,10 @@ export function getPayStrategiesConfig(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay as
-      | FeatureFlagsRaw
-      | undefined) ?? {};
+      FeatureFlagsRaw | undefined) ?? {};
   const extendedFeatureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
   const payStrategies = featureFlags.payStrategies ?? {};
   const extendedPayStrategies = extendedFeatureFlags.payStrategies ?? {};
 
@@ -727,8 +722,7 @@ export function isRelayExecuteEnabled(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
   return featureFlags.payStrategies?.relay?.gaslessEnabled ?? false;
 }
 
@@ -756,13 +750,34 @@ export function isRelayValidationEnabled(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   return isEnabledForTransaction(
     featureFlags.payStrategies?.relay?.validationEnabled,
     transaction,
   );
+}
+
+/**
+ * Whether the server strategy may quote Solana source assets.
+ *
+ * Fails closed, configured via the
+ * `confirmations_pay_extended.payStrategies.server.solanaEnabled` flag. Only
+ * `true` enables Solana sources, so they can be rolled out and rolled back
+ * independently of the transaction types enabled for the server strategy.
+ *
+ * @param messenger - Controller messenger.
+ * @returns True if Solana source quotes are enabled.
+ */
+export function isServerSolanaEnabled(
+  messenger: TransactionPayControllerMessenger,
+): boolean {
+  const state = messenger.call('RemoteFeatureFlagController:getState');
+  const featureFlags =
+    (state.remoteFeatureFlags?.confirmations_pay_extended as
+      FeatureFlagsExtendedRaw | undefined) ?? {};
+
+  return featureFlags.payStrategies?.server?.solanaEnabled === true;
 }
 
 /**
@@ -780,8 +795,7 @@ export function isServerGaslessEnabled(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   return featureFlags.payStrategies?.server?.gaslessEnabled ?? true;
 }
@@ -810,8 +824,7 @@ export function isServerValidationEnabled(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   return isEnabledForTransaction(
     featureFlags.payStrategies?.server?.validationEnabled,
@@ -844,8 +857,7 @@ export function isAtomicMaxEnabled(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   return isEnabledForTransaction(
     featureFlags.payStrategies?.relay?.atomicMaxEnabled,
@@ -870,8 +882,7 @@ export function isChainExcludedFromInfura(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   const excludedChains = featureFlags.excludeChainIdsFromInfura ?? [];
 
@@ -893,8 +904,7 @@ export function getRelayOriginGasOverhead(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay as
-      | FeatureFlagsRaw
-      | undefined) ?? {};
+      FeatureFlagsRaw | undefined) ?? {};
   return (
     featureFlags.payStrategies?.relay?.originGasOverhead ??
     DEFAULT_RELAY_ORIGIN_GAS_OVERHEAD
@@ -914,8 +924,7 @@ export function getRelayPollingInterval(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay as
-      | FeatureFlagsRaw
-      | undefined) ?? {};
+      FeatureFlagsRaw | undefined) ?? {};
   return (
     featureFlags.payStrategies?.relay?.pollingInterval ?? RELAY_POLLING_INTERVAL
   );
@@ -934,8 +943,7 @@ export function getRelayPollingTimeout(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay as
-      | FeatureFlagsRaw
-      | undefined) ?? {};
+      FeatureFlagsRaw | undefined) ?? {};
   return featureFlags.payStrategies?.relay?.pollingTimeout;
 }
 
@@ -989,8 +997,7 @@ export function getGasBuffer(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay as
-      | FeatureFlagsRaw
-      | undefined) ?? {};
+      FeatureFlagsRaw | undefined) ?? {};
 
   return (
     featureFlags.gasBuffer?.perChainConfig?.[chainId]?.buffer ??
@@ -1012,8 +1019,7 @@ export function getGasStationCostBuffer(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   const buffer = featureFlags.gasStationCostBuffer;
 
@@ -1039,8 +1045,7 @@ export function getSlippage(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay as
-      | FeatureFlagsRaw
-      | undefined) ?? {};
+      FeatureFlagsRaw | undefined) ?? {};
   const { slippageTokens } = featureFlags;
 
   const tokenMap = getCaseInsensitive(slippageTokens, chainId);
@@ -1105,8 +1110,7 @@ export function getFiatAssetPerTransactionType(
 
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const fiatFlags = state.remoteFeatureFlags?.confirmations_pay_fiat as
-    | FiatFlags
-    | undefined;
+    FiatFlags | undefined;
 
   return (
     fiatFlags?.assetPerTransactionType?.[transactionType] ??
@@ -1126,8 +1130,7 @@ export function getFiatEnabledTypes(
 ): TransactionType[] {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const fiatFlags = state.remoteFeatureFlags?.confirmations_pay_fiat as
-    | FiatFlags
-    | undefined;
+    FiatFlags | undefined;
 
   return fiatFlags?.enabledTransactionTypes ?? FIAT_ENABLED_TYPES;
 }
@@ -1153,8 +1156,7 @@ export function isResumeEnabled(
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags =
     (state.remoteFeatureFlags?.confirmations_pay_extended as
-      | FeatureFlagsExtendedRaw
-      | undefined) ?? {};
+      FeatureFlagsExtendedRaw | undefined) ?? {};
 
   const config = featureFlags.resume?.[strategy];
 
@@ -1182,8 +1184,7 @@ export function getResumeTimeoutMs(
 ): number {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const featureFlags = state.remoteFeatureFlags?.confirmations_pay_extended as
-    | FeatureFlagsExtendedRaw
-    | undefined;
+    FeatureFlagsExtendedRaw | undefined;
 
   const timeout = featureFlags?.resume?.[strategy]?.timeout;
 
@@ -1206,8 +1207,7 @@ export function getFiatFeeReserveMultiplier(
 ): number {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const fiatFlags = state.remoteFeatureFlags?.confirmations_pay_fiat as
-    | FiatFlags
-    | undefined;
+    FiatFlags | undefined;
 
   const multiplier = fiatFlags?.feeReserveMultiplier;
 
@@ -1231,8 +1231,7 @@ export function getFiatMaxRateDriftPercent(
 ): number {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const fiatFlags = state.remoteFeatureFlags?.confirmations_pay_fiat as
-    | FiatFlags
-    | undefined;
+    FiatFlags | undefined;
 
   const maxDrift = fiatFlags?.maxRateDriftPercent;
 
@@ -1246,8 +1245,7 @@ export function getDirectMoneyMusdEnabled(
 ): boolean {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const fiatFlags = state.remoteFeatureFlags?.confirmations_pay_fiat as
-    | FiatFlags
-    | undefined;
+    FiatFlags | undefined;
   return fiatFlags?.directMoneyMusdEnabled === true;
 }
 
@@ -1256,8 +1254,7 @@ export function getFiatVaultDisabled(
 ): boolean {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const fiatFlags = state.remoteFeatureFlags?.confirmations_pay_fiat as
-    | FiatFlags
-    | undefined;
+    FiatFlags | undefined;
   return fiatFlags?.vaultDisabled === true;
 }
 
@@ -1275,8 +1272,7 @@ export function getFiatOrderPollIntervalMs(
 ): number {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const fiatFlags = state.remoteFeatureFlags?.confirmations_pay_fiat as
-    | FiatFlags
-    | undefined;
+    FiatFlags | undefined;
 
   const interval = fiatFlags?.orderPollIntervalMs;
 
@@ -1299,8 +1295,7 @@ export function getFiatOrderPollTimeoutMs(
 ): number {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const fiatFlags = state.remoteFeatureFlags?.confirmations_pay_fiat as
-    | FiatFlags
-    | undefined;
+    FiatFlags | undefined;
 
   const timeout = fiatFlags?.orderPollTimeoutMs;
 
@@ -1365,8 +1360,7 @@ export function isEIP7702Chain(
 ): boolean {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const eip7702Flags = state.remoteFeatureFlags.confirmations_eip_7702 as
-    | EIP7702FeatureFlag
-    | undefined;
+    EIP7702FeatureFlag | undefined;
 
   const supportedChains = eip7702Flags?.supportedChains ?? [];
 
@@ -1389,8 +1383,7 @@ export function getEIP7702UpgradeContractAddress(
 ): Hex | undefined {
   const state = messenger.call('RemoteFeatureFlagController:getState');
   const eip7702Flags = state.remoteFeatureFlags.confirmations_eip_7702 as
-    | EIP7702FeatureFlag
-    | undefined;
+    EIP7702FeatureFlag | undefined;
 
   const contracts = getCaseInsensitive(eip7702Flags?.contracts, chainId);
 

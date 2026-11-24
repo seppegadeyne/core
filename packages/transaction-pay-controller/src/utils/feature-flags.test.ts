@@ -47,6 +47,7 @@ import {
   isAtomicMaxEnabled,
   isRelayValidationEnabled,
   isServerGaslessEnabled,
+  isServerSolanaEnabled,
   isServerValidationEnabled,
   getFeatureFlags,
   getGasBuffer,
@@ -679,6 +680,29 @@ describe('Feature Flags Utils', () => {
       });
 
       expect(isServerGaslessEnabled(messenger)).toBe(false);
+    });
+  });
+
+  describe('isServerSolanaEnabled', () => {
+    it('returns false when no feature flags are set', () => {
+      expect(isServerSolanaEnabled(messenger)).toBe(false);
+    });
+
+    it.each([
+      [true, true],
+      [false, false],
+      ['true', false],
+    ])('returns %s as %s', (solanaEnabled, expected) => {
+      getRemoteFeatureFlagControllerStateMock.mockReturnValue({
+        ...getDefaultRemoteFeatureFlagControllerState(),
+        remoteFeatureFlags: {
+          confirmations_pay_extended: {
+            payStrategies: { server: { solanaEnabled } },
+          },
+        },
+      });
+
+      expect(isServerSolanaEnabled(messenger)).toBe(expected);
     });
   });
 

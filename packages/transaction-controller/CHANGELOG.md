@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `Base58` type for base58 encoded strings ([#10273](https://github.com/MetaMask/core/pull/10273))
+
+### Changed
+
+- Widen `MetamaskPayMetadata.sourceHash` to `Hex | Base58`, so it can hold the base58 transaction signature of a Solana source ([#10273](https://github.com/MetaMask/core/pull/10273))
+
 ## [74.4.0]
 
 ### Added
