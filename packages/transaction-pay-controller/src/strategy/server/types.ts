@@ -165,6 +165,7 @@ export enum ServerStatus {
   Confirmed = 'CONFIRMED',
   Failed = 'FAILED',
   Refunded = 'REFUNDED',
+  Timeout = 'TIMEOUT',
   Unknown = 'UNKNOWN',
 }
 
