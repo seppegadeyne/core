@@ -210,6 +210,8 @@ import type {
   ReadyToTradeResult,
   SubscribeAccountParams,
   SubscribeCandlesParams,
+  SubscribeChaseOrderChangesParams,
+  SubscribeMarketChangesParams,
   SubscribeOICapsParams,
   OrderBookData,
   OrderBookLevel,
@@ -2012,6 +2014,15 @@ export class LighterProvider implements PerpsProvider {
 
   readonly #oiCapSubscribers: Set<SubscribeOICapsParams> = new Set();
 
+  /** Told when the venue's push shows that its markets changed. */
+  readonly #marketChangeListeners = new Set<() => void>();
+
+  /** Markets the venue's price push has listed; null before its first frame. */
+  #listedMarketIds: Set<string> | null = null;
+
+  /** Told when a Chase record changed. */
+  readonly #chaseChangeListeners = new Set<() => void>();
+
   readonly #accountSubscribers: Set<SubscribeAccountParams> = new Set();
 
   readonly #positionSubscribers: Set<SubscribePositionsParams> = new Set();
@@ -2074,6 +2085,8 @@ export class LighterProvider implements PerpsProvider {
     this.#deps = options.platformDependencies;
     this.#chaseService = new LighterChaseService({
       storage: this.#deps.diskCache,
+      onChange: (): void =>
+        this.#notifyListeners('chase', this.#chaseChangeListeners),
     });
     this.#chaseTestnetProbe = options.chaseTestnetProbe ?? false;
     if (this.#chaseTestnetProbe && options.isTestnet === false) {
@@ -2258,6 +2271,8 @@ export class LighterProvider implements PerpsProvider {
     this.#lastHealthSignature = null;
     this.#priceSubscribers.clear();
     this.#oiCapSubscribers.clear();
+    this.#marketChangeListeners.clear();
+    this.#chaseChangeListeners.clear();
     this.#accountSubscribers.clear();
     this.#positionSubscribers.clear();
     this.#orderSubscribers.clear();
@@ -2602,7 +2617,7 @@ export class LighterProvider implements PerpsProvider {
     if (this.#isDisconnected || !this.#hasAnySubscriber()) {
       return;
     }
-    if (this.#priceSubscribers.size > 0 || this.#oiCapSubscribers.size > 0) {
+    if (this.#channelHasListeners('market_stats/all')) {
       this.#requestChannel('market_stats/all');
     }
     for (const [marketId, subscribers] of this.#orderBookSubscribers) {
@@ -10211,8 +10226,12 @@ export class LighterProvider implements PerpsProvider {
     );
   };
 
-  async getMarkets(_params?: GetMarketsParams): Promise<MarketInfo[]> {
+  async getMarkets(params?: GetMarketsParams): Promise<MarketInfo[]> {
     try {
+      if (params?.skipCache) {
+        // A market listed since the last read needs its leverage metadata.
+        this.#marginFetchedAt = 0;
+      }
       const markets = await this.#clientService.getOrderBooks();
       await this.#ensureMarketMargins();
       return markets
@@ -18842,6 +18861,7 @@ export class LighterProvider implements PerpsProvider {
     return (
       this.#priceSubscribers.size > 0 ||
       this.#oiCapSubscribers.size > 0 ||
+      this.#marketChangeListeners.size > 0 ||
       this.#hasAccountSubscriber() ||
       [...this.#orderBookSubscribers.values()].some(
         (subscribers) => subscribers.size > 0,
@@ -18869,7 +18889,11 @@ export class LighterProvider implements PerpsProvider {
    */
   readonly #channelHasListeners = (channel: string): boolean => {
     if (channel === 'market_stats/all') {
-      return this.#priceSubscribers.size > 0 || this.#oiCapSubscribers.size > 0;
+      return (
+        this.#priceSubscribers.size > 0 ||
+        this.#oiCapSubscribers.size > 0 ||
+        this.#marketChangeListeners.size > 0
+      );
     }
     if (
       channel === LIGHTER_ACCOUNT_CHANNELS_KEY ||
@@ -19007,6 +19031,7 @@ export class LighterProvider implements PerpsProvider {
       this.#candleSubscribers.delete(seriesKey);
     } else if (channel === 'market_stats/all') {
       this.#lastPriceBySymbol.clear();
+      this.#listedMarketIds = null;
     }
     this.#logChannelCount('released', channel);
   };
@@ -19293,6 +19318,10 @@ export class LighterProvider implements PerpsProvider {
       );
       this.#dispatchPriceUpdates(updates);
       this.#dispatchOICaps(Object.values(message.marketStats));
+      this.#detectMarketChange(
+        Object.keys(message.marketStats),
+        type.startsWith('subscribed'),
+      );
       return;
     }
     if (type.includes('user_stats') && message.stats) {
@@ -19719,6 +19748,90 @@ export class LighterProvider implements PerpsProvider {
       }
     }
   };
+
+  /**
+   * Compare the markets of a price frame with the ones listed so far.
+   *
+   * @param marketIds - Markets in the frame.
+   * @param isSnapshot - The frame lists every market, so absence is a removal.
+   */
+  readonly #detectMarketChange = (
+    marketIds: string[],
+    isSnapshot: boolean,
+  ): void => {
+    const listed = this.#listedMarketIds;
+    if (listed === null) {
+      this.#listedMarketIds = new Set(marketIds);
+      return;
+    }
+    const changed =
+      marketIds.some((marketId) => !listed.has(marketId)) ||
+      (isSnapshot && marketIds.length !== listed.size);
+    if (isSnapshot) {
+      this.#listedMarketIds = new Set(marketIds);
+    } else {
+      marketIds.forEach((marketId) => listed.add(marketId));
+    }
+    if (changed) {
+      this.#notifyListeners('marketChanges', this.#marketChangeListeners);
+    }
+  };
+
+  readonly #notifyListeners = (
+    label: string,
+    listeners: ReadonlySet<() => void>,
+  ): void => {
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch (error) {
+        this.#logSubscriberError(label, error);
+      }
+    }
+  };
+
+  /**
+   * Call back when the venue's price push lists a new market or drops one.
+   *
+   * @param params - Subscription parameters.
+   * @param params.callback - Called on each change.
+   * @returns A cleanup function to unsubscribe.
+   */
+  subscribeToMarketChanges({
+    callback,
+  }: SubscribeMarketChangesParams): () => void {
+    if (this.#isDisconnected) {
+      return NOOP_UNSUBSCRIBE;
+    }
+    const listener = (): void => callback();
+    this.#marketChangeListeners.add(listener);
+    this.#requestChannel('market_stats/all');
+    this.#ensureStream();
+    return () => {
+      this.#marketChangeListeners.delete(listener);
+      this.#onListenerRemoved('market_stats/all');
+    };
+  }
+
+  /**
+   * Call back when a Chase record of any account changed.
+   *
+   * @param params - Subscription parameters.
+   * @param params.callback - Called on each change.
+   * @returns A cleanup function to unsubscribe.
+   */
+  subscribeToChaseOrderChanges({
+    callback,
+  }: SubscribeChaseOrderChangesParams): () => void {
+    if (this.#isDisconnected) {
+      return NOOP_UNSUBSCRIBE;
+    }
+    const listener = (): void => callback();
+    this.#chaseChangeListeners.add(listener);
+    return () => {
+      this.#chaseChangeListeners.delete(listener);
+    };
+  }
 
   readonly #dispatchOICaps = (stats: LighterWsMarketStat[]): void => {
     if (this.#oiCapSubscribers.size === 0) {
