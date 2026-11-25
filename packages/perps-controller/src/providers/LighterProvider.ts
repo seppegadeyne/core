@@ -18733,15 +18733,19 @@ export class LighterProvider implements PerpsProvider {
   // ============================================================================
 
   /**
-   * Notify each order/fill subscriber without allowing one listener to stop others.
+   * Notify each subscriber without allowing one listener to stop others.
    *
    * @param error - Account channel setup failure.
+   * @param readers - The streams it failed.
    */
-  readonly #notifySubscriptionError = (error: Error): void => {
-    for (const [label, subscribers] of [
-      ['orders', this.#orderSubscribers],
-      ['fills', this.#fillSubscribers],
-    ] as const) {
+  readonly #notifySubscriptionError = (
+    error: Error,
+    readers: readonly (readonly [
+      string,
+      ReadonlySet<{ onError?: (error: Error) => void }>,
+    ])[],
+  ): void => {
+    for (const [label, subscribers] of readers) {
       for (const subscriber of subscribers) {
         try {
           subscriber.onError?.(error);
@@ -18812,7 +18816,11 @@ export class LighterProvider implements PerpsProvider {
             channelAddress === this.#boundAddress &&
             this.#accountChannelsPromise === setupPromise
           ) {
-            this.#notifySubscriptionError(ensureError(error));
+            // Positions and balances need no auth token.
+            this.#notifySubscriptionError(ensureError(error), [
+              ['orders', this.#orderSubscribers],
+              ['fills', this.#fillSubscribers],
+            ]);
           }
           // Setup failures are not authoritative empty order state. Account
           // switches and deselection already emit their synchronous reset.
@@ -18840,7 +18848,12 @@ export class LighterProvider implements PerpsProvider {
           generation === this.#sessionGeneration &&
           this.#accountChannelsPromise === setupPromise
         ) {
-          this.#notifySubscriptionError(ensureError(error));
+          this.#notifySubscriptionError(ensureError(error), [
+            ['orders', this.#orderSubscribers],
+            ['fills', this.#fillSubscribers],
+            ['positions', this.#positionSubscribers],
+            ['account', this.#accountSubscribers],
+          ]);
         }
         // An aborted previous-account setup has no authority over the new
         // session. Current-session failures also preserve the last known data.
