@@ -127,6 +127,7 @@ const ORIGINAL_QUOTE_MOCK: ServerQuote = {
     raw: '1000000',
   },
   provider: 'relay',
+  sender: ORIGINAL_FROM_MOCK,
   steps: [
     {
       type: 'transaction' as const,
@@ -1652,7 +1653,7 @@ describe('submitServerQuotes', () => {
       const quote = cloneDeep(QUOTE_MOCK);
       quote.original = {
         ...quote.original,
-        lighterAccountIndex: 770167,
+        sender: '770167',
         steps: [LIGHTER_STEP_MOCK],
         gasless: false,
       };
@@ -1701,16 +1702,6 @@ describe('submitServerQuotes', () => {
         'nonce too low',
       );
       expect(getServerStatusMock).not.toHaveBeenCalled();
-    });
-
-    it('throws without sending when the quote has no Lighter account index', async () => {
-      const lighterRequest = buildLighterRequest();
-      lighterRequest.quotes[0].original.lighterAccountIndex = undefined;
-
-      await expect(submitServerQuotes(lighterRequest)).rejects.toThrow(
-        'Lighter quote has no account index',
-      );
-      expect(lighterSubmitTransferMock).not.toHaveBeenCalled();
     });
 
     it('throws a generic error when a failed transfer has no message', async () => {
