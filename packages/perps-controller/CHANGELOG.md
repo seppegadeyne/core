@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `PerpsController:getExchangeAccountStatus` for read-only registration checks on an explicit venue. Export `GetExchangeAccountStatusParams`, `ExchangeAccountStatus`, `PerpsControllerGetExchangeAccountStatusAction`, and an optional provider hook. Lighter returns the master account index when registered; venues without a registration step return `{ registered: true }`. ([PR](https://github.com/MetaMask/core/pull/new/TAT-4756-public-action-lighter-stream))
+- Add `PerpsController:getExchangeAccountStatus` for read-only registration checks on an explicit venue. Export `GetExchangeAccountStatusParams`, `ExchangeAccountStatus`, `PerpsControllerGetExchangeAccountStatusAction`, and an optional provider hook. Lighter returns the master account index when registered; venues without a registration step return `{ registered: true }`. ([#11746](https://github.com/MetaMask/core/pull/11746))
 
 ### Fixed
 
-- Resume existing Lighter account, position, fill and order subscriptions when a lookup discovers the account created by a first deposit, without reconnecting or prompting for a trading key. ([PR](https://github.com/MetaMask/core/pull/new/TAT-4756-public-action-lighter-stream))
+- Resume existing Lighter account, position, fill and order subscriptions when a lookup discovers the account created by a first deposit, without reconnecting or prompting for a trading key. ([#11746](https://github.com/MetaMask/core/pull/11746))
 
 ## [26.1.0]
 
