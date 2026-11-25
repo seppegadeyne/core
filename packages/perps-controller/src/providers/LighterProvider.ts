@@ -19300,6 +19300,7 @@ export class LighterProvider implements PerpsProvider {
     repair?: symbol,
   ): void {
     const generation = this.#sessionGeneration;
+    let unsubscribed = false;
     const isCurrent = (): boolean =>
       this.#priceWs === ws &&
       ws.readyState === 1 &&
@@ -19313,6 +19314,7 @@ export class LighterProvider implements PerpsProvider {
         }
         if (repair !== undefined) {
           ws.send(JSON.stringify({ type: 'unsubscribe', channel }));
+          unsubscribed = true;
         }
         this.#sendSubscribe(channel, token);
       })
@@ -19325,7 +19327,14 @@ export class LighterProvider implements PerpsProvider {
           this.#ensureSessionBinding();
           if (isCurrent()) {
             this.#ordersSnapshotRepair = 'retry';
-            this.#notifySubscriptionError(ensureError(error), ['orders']);
+            if (unsubscribed) {
+              this.#wsOrders = null;
+            }
+            // A failed mint leaves the original subscription live. Only evict
+            // its multiplexed orders when direct subscribers cannot replay them.
+            if (!this.#wsOrders?.size) {
+              this.#notifySubscriptionError(ensureError(error), ['orders']);
+            }
           }
         }
       });
