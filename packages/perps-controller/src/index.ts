@@ -172,6 +172,7 @@ export type {
   PerpsControllerSuspendChaseOrdersAction,
   PerpsControllerStopEligibilityMonitoringAction,
   PerpsControllerStopMarketDataPreloadAction,
+  PerpsControllerSubmitLighterTransferAction,
   PerpsControllerSubscribeToAccountAction,
   PerpsControllerSubscribeToAvailableToTradeAction,
   PerpsControllerSubscribeToCandlesAction,
@@ -626,6 +627,8 @@ export type {
   LighterWasmCall,
   LighterSignModifyOrderWireParams,
   LighterAuthConfig,
+  LighterTransferParams,
+  LighterTransferResult,
 } from './types/lighter-types.js';
 export {
   PERPS_CONSTANTS,
