@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump `fast-json-patch` from `^3.1.1` to `^3.1.2` ([#11760](https://github.com/MetaMask/core/pull/11760))
+
 ## [74.4.1]
 
 ### Fixed
