@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Report Lighter wallet registration in `AccountState.exchangeAccountStatus` on account reads and subscriptions. Time bounded account discovery with `LIGHTER_ACCOUNT_DISCOVERY_CONFIG` in `constants/lighterConfig`. ([#11746](https://github.com/MetaMask/core/pull/11746))
+- Report Lighter wallet registration in `AccountState.exchangeAccountStatus` on account reads and subscriptions. Export `LIGHTER_ACCOUNT_DISCOVERY_CONFIG` (from `constants/lighterConfig`) for the discovery interval and deadline. ([#11746](https://github.com/MetaMask/core/pull/11746))
 - Add `PerpsController:getExchangeAccountStatus` for read-only registration checks on an explicit venue. Export `GetExchangeAccountStatusParams`, `ExchangeAccountStatus`, `PerpsControllerGetExchangeAccountStatusAction`, and an optional provider hook. Lighter returns the master account index when registered; venues without a registration step return `{ registered: true }`. ([#11746](https://github.com/MetaMask/core/pull/11746))
 
 ### Fixed
