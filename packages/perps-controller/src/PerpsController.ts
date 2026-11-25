@@ -1165,6 +1165,9 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Wait after a market change before reading the markets again. */
 const MARKET_CHANGE_SETTLE_MS = 1000;
 
+/** Wait after a fill before reading the fee rates again. */
+const FEE_CHANGE_SETTLE_MS = 1000;
+
 /**
  * `subscribeTo*` streams that span every venue in aggregated mode. The others
  * follow the default provider unless they name one.
@@ -4251,6 +4254,7 @@ export class PerpsController extends BaseController<
     let readId = 0;
     let last: string | undefined;
     let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
     const read = (fresh: boolean): void => {
       readId += 1;
       const id = readId;
@@ -4309,8 +4313,12 @@ export class PerpsController extends BaseController<
       );
     const stopFills = this.subscribeToOrderFills({
       callback: (_fills, isSnapshot) => {
+        // Fills come in bursts; one read after they settle covers them all.
         if (!isSnapshot) {
-          refresh();
+          settleTimer ??= setTimeout(() => {
+            settleTimer = undefined;
+            refresh();
+          }, FEE_CHANGE_SETTLE_MS);
         }
       },
     });
@@ -4319,6 +4327,7 @@ export class PerpsController extends BaseController<
     return () => {
       closed = true;
       clearTimeout(expiryTimer);
+      clearTimeout(settleTimer);
       this.#feeRateRefreshers.delete(refresh);
       stopRewards?.();
       stopFills();
