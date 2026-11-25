@@ -7,23 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Bump `@metamask/eth-sig-util` from `^10.0.0` to `^10.0.1` ([#11546](https://github.com/MetaMask/core/pull/11546))
-- Bump `immer` from `^11.1.18` to `^11.2.10` ([#11645](https://github.com/MetaMask/core/pull/11645))
-
-## [28.2.2]
-
-### Changed
-
-- Bump `@metamask/eth-hd-keyring` from `^15.0.0` to `^16.0.0` ([#11532](https://github.com/MetaMask/core/pull/11532))
-- Bump `@metamask/eth-simple-keyring` from `^13.0.0` to `^13.0.3` ([#11532](https://github.com/MetaMask/core/pull/11532))
-
-## [28.2.1]
-
 ### Added
 
-- Add support for Node.js 26 ([#10981](https://github.com/MetaMask/core/pull/10981))
 - Add atomic keyring builder support: a `KeyringBuilder` can now declare `atomic: true` to receive a `KeyringBuilderContext`, whose `update` callback commits state mutations on the built keyring's behalf — the controller lock is held only for that short commit window, while long-running keyring operations run entirely outside it ([#TODO](https://github.com/MetaMask/core/pull/TODO))
   - The declaration is enforced at the construction choke point: a builder declaring `atomic: true` whose result is not an `AtomicKeyring` (from `@metamask/keyring-sdk`) throws an explicit error.
   - Updates from keyrings no longer registered with the controller are rejected with an explicit error.
@@ -43,6 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - A keyring that fails to destroy during a rollback no longer aborts it: the failure is logged, the rollback completes, and the error of the failed operation is still the one thrown.
   - Instances created by a failed operation are destroyed before any keyring is recreated from its snapshot, releasing any shared resource they hold (e.g. a hardware SDK singleton) for the recreation.
   - Recreated keyrings are checked for duplicate accounts during both scoped and whole-wallet rollback, and destroyed if validation fails ([#11707](https://github.com/MetaMask/core/pull/11707)).
+- Bump `@metamask/eth-sig-util` from `^10.0.0` to `^10.0.1` ([#11546](https://github.com/MetaMask/core/pull/11546))
+- Bump `immer` from `^11.1.18` to `^11.2.10` ([#11645](https://github.com/MetaMask/core/pull/11645))
+
+## [28.2.2]
+
+### Changed
+
+- Bump `@metamask/eth-hd-keyring` from `^15.0.0` to `^16.0.0` ([#11532](https://github.com/MetaMask/core/pull/11532))
+- Bump `@metamask/eth-simple-keyring` from `^13.0.0` to `^13.0.3` ([#11532](https://github.com/MetaMask/core/pull/11532))
+
+## [28.2.1]
+
+### Added
+
+- Add support for Node.js 26 ([#10981](https://github.com/MetaMask/core/pull/10981))
+
+### Changed
+
 - Bump `@metamask/base-controller` from `^10.0.0` to `^10.1.0` ([#10864](https://github.com/MetaMask/core/pull/10864))
 - Bump `@metamask/utils` from `^12.0.0` to `^12.0.2` ([#11107](https://github.com/MetaMask/core/pull/11107), [#11474](https://github.com/MetaMask/core/pull/11474))
 - Bump `@metamask/eth-sig-util` from `^9.0.0` to `^10.0.0` ([#11474](https://github.com/MetaMask/core/pull/11474))
