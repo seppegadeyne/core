@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Add the partner's permissioned `ignp` HIP-3 dex to `TESTNET_HIP3_CONFIG.EnabledDexs`, so testnet loads and trades `ignp:*` markets alongside `xyz` ([#11701](https://github.com/MetaMask/core/pull/11701))
 - Every `subscribeTo*` method except `subscribeToConnectionState` and `subscribeToProviderHealth` now goes through one shared `StreamChannelManager`: one ref-counted venue subscription per parameter set, the last value replayed to later subscribers, a throttle per subscriber, and REST read only while the transport is down. Callers keep the same API ([#11742](https://github.com/MetaMask/core/pull/11742))
   - Every `Subscribe*Params` type routed through it takes an optional `throttleMs`: the minimum time between deliveries to that subscriber, without affecting other subscribers of the same channel
   - A channel whose venue subscription fails reopens it itself, with a bounded backoff and again on reconnect. Subscribers keep their subscription and hear each failure through `onError`; they do not resubscribe. In aggregated mode one venue's failure leaves the other venues streaming and only that venue is reopened
