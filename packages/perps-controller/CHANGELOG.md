@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Add the partner's permissioned `ignp` HIP-3 dex to `TESTNET_HIP3_CONFIG.EnabledDexs`, so testnet loads and trades `ignp:*` markets alongside `xyz` ([#11701](https://github.com/MetaMask/core/pull/11701))
+- Bump `bignumber.js` from `^9.1.2` to `^11.1.5` ([#11587](https://github.com/MetaMask/core/pull/11587))
 
 ## [26.2.0]
 
